@@ -5,7 +5,7 @@ using Parse;
 using System.Threading.Tasks;
 using UnityEngine.UI;
 
-public class ParseInit : MonoBehaviour {
+public class ParseController : MonoBehaviour {
 
     public GameObject LogInMenu;
     public GameObject SignUpMenu;
