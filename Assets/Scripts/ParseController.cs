@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Parse;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine.UI;
 
@@ -16,39 +17,45 @@ public class ParseController : MonoBehaviour {
     public InputField usernameSignup;
     public InputField passwordSignup;
     public InputField RetypePassword;
-    bool LoggedIn = false;
+    string AcctName;
+    private static ParseObject AcctObj;
+
+    private static bool AccountFound = false;
+    private static bool UsernameFound = false;
+    private static bool LoggedIn = false;
+    private static bool MembershipFound = false;
+
+    private static bool NextStep = false;
+
+    private static bool AccountQueryFailed = false;
+    private static bool UsernameQueryFailed = false;
+    private static bool LoginFailed = false;
+    private static bool MembershipQueryFailed = false;
 
 	// Use this for initialization
 	void Start () {
 
+        AcctName = "eXpTest";
+
         ParseInitializeBehaviour _script = new GameObject("ParseInitializeBehaviour").AddComponent<ParseInitializeBehaviour>();
-        _script.applicationID = "myAppId";
-        _script.dotnetKey = "master";
+        _script.applicationID = "zquCagFDNXC8ipCFPjRjV8xw7y4Jik";
+        _script.dotnetKey = "o3UfuztDWwYvE8GBgQRMewbd";
 
         ParseClient.Initialize(new ParseClient.Configuration
         {
-            ApplicationId = "myAppId",
-            WindowsKey = "master",
+            ApplicationId = "zquCagFDNXC8ipCFPjRjV8xw7y4Jik",
+            WindowsKey = "o3UfuztDWwYvE8GBgQRMewbd",
 
-            Server = "http://localhost:1337/parse/"
+            Server = "http://staging.api.virbela.com/parse/"
         });
 
         if(ParseUser.CurrentUser != null)
         {
-            SignUpMenu.SetActive(false);
-            LogInMenu.SetActive(false);
-            string name = "";
-            if(ParseUser.CurrentUser.TryGetValue<string>("username", out name))
-            {
-                WelcomeText.GetComponent<Text>().text = name;
-            }
-            LoggedIn = true;
+            ParseUser.LogOutAsync();
         }
-        else
-        {
-            SignUpMenu.SetActive(false);
-            LoggedInMenu.SetActive(false);
-        }
+
+        SignUpMenu.SetActive(false);
+        LoggedInMenu.SetActive(false);
 
         passwordLogin.contentType = InputField.ContentType.Password;
         passwordSignup.contentType = InputField.ContentType.Password;
@@ -62,8 +69,27 @@ public class ParseController : MonoBehaviour {
         SignUpMenu.SetActive(!SignUpMenu.activeSelf);
     }
 
+    public void BeginLogIn()
+    {
+        Debug.Log("Querying username...");
+        ParseQuery<ParseUser> query = ParseUser.Query.WhereEqualTo("username", usernameLogin.text);
+        query.CountAsync().ContinueWith(t =>
+        {
+            if (t.Result == 0)
+            {
+                UsernameQueryFailed = true;
+            }
+            else
+            {
+                UsernameFound = true;
+                NextStep = true;
+            }
+        });
+    }
+
     public void LogIn()
     {
+        Debug.Log("Checking password...");
         if(usernameLogin.text.Equals("") || passwordLogin.text.Equals(""))
         {
             return;
@@ -72,16 +98,50 @@ public class ParseController : MonoBehaviour {
         {
             if (t.IsFaulted || t.IsCanceled)
             {
-                Debug.Log("Login failed");
+                LoginFailed = true;
             }
             else
             {
-                ParseUser currUser;
-                Debug.Log("Login succeeded");
-                ParseUser.Query.WhereEqualTo("username", usernameLogin.text).FirstAsync().ContinueWith(v =>
-                {
-                    currUser = v.Result;
-                });
+                LoggedIn = true;
+                NextStep = true;
+            }
+        });
+    }
+
+    public void FindAccount()
+    {
+        Debug.Log("Finding account...");
+        ParseQuery<ParseObject> query = ParseObject.GetQuery("ServerConfig").WhereEqualTo("name", AcctName);
+        query.FirstAsync().ContinueWith(t =>
+        {
+            ParseObject ServerConfigObj = t.Result;
+            if(!ServerConfigObj.ContainsKey("account"))
+            {
+                AccountQueryFailed = true;
+            }
+            else
+            {
+                ServerConfigObj.TryGetValue<ParseObject>("account", out AcctObj);
+                AccountFound = true;
+                NextStep = true;
+            }
+        });
+    }
+
+    public void FindMembership()
+    {
+        Debug.Log("Finding membership...");
+        ParseQuery<ParseObject> query = ParseObject.GetQuery("Membership").WhereEqualTo("account", AcctObj).WhereEqualTo("user", ParseUser.CurrentUser);
+        query.CountAsync().ContinueWith(t =>
+        {
+            if(t.Result == 0)
+            {
+                MembershipQueryFailed = true;
+            }
+            else
+            {
+                MembershipFound = true;
+                NextStep = true;
             }
         });
     }
@@ -126,8 +186,29 @@ public class ParseController : MonoBehaviour {
 	// Update is called once per frame
 	void Update () {
 
-        if (ParseUser.CurrentUser != null && !LoggedIn)
+        if (UsernameFound && !LoggedIn && !AccountFound && !MembershipFound && NextStep)
         {
+            NextStep = false;
+            LogIn();
+        }
+        else if (UsernameFound && LoggedIn && !AccountFound && !MembershipFound && NextStep)
+        {
+            NextStep = false;
+            FindAccount();
+        }
+        else if (UsernameFound && LoggedIn && AccountFound && !MembershipFound && NextStep)
+        {
+            NextStep = false;
+            FindMembership();
+        }
+        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep)
+        {
+            NextStep = false;
+            AccountFound = false;
+            UsernameFound = false;
+            LoggedIn = false;
+            MembershipFound = false;
+
             Debug.Log("Logging in...");
             usernameLogin.text = "";
             passwordLogin.text = "";
@@ -139,6 +220,30 @@ public class ParseController : MonoBehaviour {
                 WelcomeText.GetComponent<Text>().text = name;
                 LoggedIn = true;
             }
+        }
+
+        if(AccountQueryFailed)
+        {
+            Debug.Log("Account verification failed");
+            AccountQueryFailed = false;
+        }
+
+        if(LoginFailed)
+        {
+            Debug.Log("Invalid password");
+            LoginFailed = false;
+        }
+
+        if(MembershipQueryFailed)
+        {
+            Debug.Log("Membership Query Failed");
+            MembershipQueryFailed = false;
+        }
+
+        if(UsernameQueryFailed)
+        {
+            Debug.Log("Invalid username");
+            UsernameQueryFailed = false;
         }
 
     }
