@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Parse;
-using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine.UI;
 
@@ -215,9 +214,9 @@ public class ParseController : MonoBehaviour {
             LogInMenu.SetActive(false);
             LoggedInMenu.SetActive(true);
             string name = "";
-            if (ParseUser.CurrentUser.TryGetValue<string>("username", out name))
+            if (ParseUser.CurrentUser.TryGetValue<string>("displayname", out name))
             {
-                WelcomeText.GetComponent<Text>().text = name;
+                WelcomeText.GetComponent<Text>().text = "Welcome, " + name + "!";
                 LoggedIn = true;
             }
         }
