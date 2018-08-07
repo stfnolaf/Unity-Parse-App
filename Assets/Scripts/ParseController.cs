@@ -16,7 +16,7 @@ public class ParseController : MonoBehaviour {
     public InputField usernameSignup;
     public InputField passwordSignup;
     public InputField RetypePassword;
-    string AcctName;
+    string AcctName = "WayMakers";
     private static string AcctId;
     private static string SessionToken;
 
@@ -25,7 +25,7 @@ public class ParseController : MonoBehaviour {
     private static bool LoggedIn = false;
     private static bool MembershipFound = false;
     private static bool CurrentSessionFound = true;
-    private static bool StandingChecked = true;
+    private static bool GoodStanding = true;
 
     private static bool NextStep = false;
 
@@ -35,32 +35,34 @@ public class ParseController : MonoBehaviour {
     private static bool MembershipQueryFailed = false;
     private static bool BadStanding = false;
 
+    string url = "https://api.virbela.com/parse/";
+    string appID = "zquCagFDNXC8ipCFPjRjV8xw7y4Jik";
+    string key = "o3UfuztDWwYvE8GBgQRMewbd";
+
 
     private void Awake()
     {
         ParseInitializeBehaviour _script = new GameObject("ParseInitializeBehaviour").AddComponent<ParseInitializeBehaviour>();
-        _script.applicationID = "zquCagFDNXC8ipCFPjRjV8xw7y4Jik";
-        _script.dotnetKey = "o3UfuztDWwYvE8GBgQRMewbd";
+        _script.applicationID = appID;
+        _script.dotnetKey = key;
     }
 
 
     // Use this for initialization
     void Start () {
 
-        AcctName = "WayMakers";
-
         if(AcctName.Equals("WayMakers"))
         {
             CurrentSessionFound = false;
-            StandingChecked = false;
+            GoodStanding = false;
         }
 
         ParseClient.Initialize(new ParseClient.Configuration
         {
-            ApplicationId = "zquCagFDNXC8ipCFPjRjV8xw7y4Jik",
-            WindowsKey = "o3UfuztDWwYvE8GBgQRMewbd",
+            ApplicationId = appID,
+            WindowsKey = key,
 
-            Server = "https://api.virbela.com/parse/"
+            Server = url
         });
 
         if(ParseUser.CurrentUser != null)
@@ -128,17 +130,13 @@ public class ParseController : MonoBehaviour {
         ParseQuery<ParseObject> query = ParseObject.GetQuery("ServerConfig").WhereEqualTo("name", AcctName);
         query.FirstAsync().ContinueWith(t =>
         {
-            Debug.Log("Task entered");
             ParseObject ServerConfigObj = t.Result;
-            Debug.Log("ServerConfigObj set");
             if(!ServerConfigObj.ContainsKey("account"))
             {
-                Debug.Log("Entered if statement");
                 AccountQueryFailed = true;
             }
             else
             {
-                Debug.Log("Entered else statement");
                 ParseObject temp;
                 ServerConfigObj.TryGetValue<ParseObject>("account", out temp);
                 AcctId = temp.ObjectId;
@@ -151,8 +149,6 @@ public class ParseController : MonoBehaviour {
     public void FindMembership()
     {
         Debug.Log("Finding membership...");
-        Debug.Log(AcctId);
-        Debug.Log(ParseUser.CurrentUser.ObjectId);
         ParseQuery<ParseObject> query = ParseObject.GetQuery("Membership")
             .WhereEqualTo("account", ParseObject.CreateWithoutData("Account", AcctId))
             .WhereEqualTo("user", ParseUser.CreateWithoutData("_User", ParseUser.CurrentUser.ObjectId));
@@ -177,7 +173,6 @@ public class ParseController : MonoBehaviour {
         {
             var result = t.Result;
             SessionToken = result.SessionToken;
-            Debug.Log(SessionToken);
             CurrentSessionFound = true;
             NextStep = true;
         });
@@ -194,15 +189,22 @@ public class ParseController : MonoBehaviour {
         };
         ParseCloud.CallFunctionAsync<IDictionary<string, object>>("isSubscribed", dictionary).ContinueWith(t =>
         {
+            bool found = false;
             foreach (var item in t.Result)
             {
                 if (item.Key.Equals("isSubscribed"))
                 {
+                    found = true;
                     NextStep = true;
-                    StandingChecked = item.Value.ToString().Equals("True");
-                    BadStanding = !StandingChecked;
+                    GoodStanding = item.Value.ToString().Equals("True");
+                    BadStanding = !GoodStanding;
                     break;
                 }
+            }
+            if(!found)
+            {
+                GoodStanding = false;
+                BadStanding = !GoodStanding;
             }
         });
     }
@@ -262,23 +264,25 @@ public class ParseController : MonoBehaviour {
             NextStep = false;
             FindMembership();
         }
-        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && !CurrentSessionFound && !StandingChecked)
+        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && !CurrentSessionFound && !GoodStanding)
         {
             NextStep = false;
             GetCurrentSession();
         }
-        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && CurrentSessionFound && !StandingChecked)
+        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && CurrentSessionFound && !GoodStanding)
         {
             NextStep = false;
             CheckStanding();
         }
-        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && CurrentSessionFound && StandingChecked)
+        else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && CurrentSessionFound && GoodStanding)
         {
             NextStep = false;
             AccountFound = false;
             UsernameFound = false;
             LoggedIn = false;
             MembershipFound = false;
+            CurrentSessionFound = (AcctName.Equals("WayMakers")) ? false : true;
+            GoodStanding = (AcctName.Equals("WayMakers")) ? false : true;
 
             Debug.Log("Logging in...");
             usernameLogin.text = "";
@@ -323,6 +327,7 @@ public class ParseController : MonoBehaviour {
         {
             Debug.Log("Member is in bad standing");
             BadStanding = false;
+            ParseUser.LogOutAsync();
         }
 
     }
