@@ -198,6 +198,7 @@ public class ParseController : MonoBehaviour {
                     NextStep = true;
                     GoodStanding = item.Value.ToString().Equals("True");
                     BadStanding = !GoodStanding;
+                    NextStep = GoodStanding;
                     break;
                 }
             }
@@ -245,9 +246,28 @@ public class ParseController : MonoBehaviour {
         LogInMenu.SetActive(true);
         LoggedIn = false;
     }
-	
-	// Update is called once per frame
-	void Update () {
+
+    private void ResetAllFlags()
+    {
+        //Manual multithreading controllers
+        AccountFound = false;
+        UsernameFound = false;
+        LoggedIn = false;
+        MembershipFound = false;
+        NextStep = false;
+        CurrentSessionFound = (AcctName.Equals("WayMakers")) ? false : true;
+        GoodStanding = (AcctName.Equals("WayMakers")) ? false : true;
+
+        //Error flags
+        AccountQueryFailed = false;
+        UsernameQueryFailed = false;
+        LoginFailed = false;
+        MembershipQueryFailed = false;
+        BadStanding = false;
+    }
+
+    // Update is called once per frame
+    void Update () {
 
         if (UsernameFound && !LoggedIn && !AccountFound && !MembershipFound && NextStep)
         {
@@ -276,13 +296,7 @@ public class ParseController : MonoBehaviour {
         }
         else if (UsernameFound && LoggedIn && AccountFound && MembershipFound && NextStep && CurrentSessionFound && GoodStanding)
         {
-            NextStep = false;
-            AccountFound = false;
-            UsernameFound = false;
-            LoggedIn = false;
-            MembershipFound = false;
-            CurrentSessionFound = (AcctName.Equals("WayMakers")) ? false : true;
-            GoodStanding = (AcctName.Equals("WayMakers")) ? false : true;
+            ResetAllFlags();
 
             Debug.Log("Logging in...");
             usernameLogin.text = "";
@@ -299,12 +313,14 @@ public class ParseController : MonoBehaviour {
 
         if (LoginFailed)
         {
+            ResetAllFlags();
             Debug.Log("Invalid password");
             LoginFailed = false;
         }
 
         if (AccountQueryFailed)
         {
+            ResetAllFlags();
             Debug.Log("Account verification failed");
             AccountQueryFailed = false;
             ParseUser.LogOutAsync();
@@ -312,6 +328,7 @@ public class ParseController : MonoBehaviour {
 
         if(MembershipQueryFailed)
         {
+            ResetAllFlags();
             Debug.Log("Membership Query Failed");
             MembershipQueryFailed = false;
             ParseUser.LogOutAsync();
@@ -319,12 +336,14 @@ public class ParseController : MonoBehaviour {
 
         if (UsernameQueryFailed)
         {
+            ResetAllFlags();
             Debug.Log("Invalid username");
             UsernameQueryFailed = false;
         }
 
         if (BadStanding)
         {
+            ResetAllFlags();
             Debug.Log("Member is in bad standing");
             BadStanding = false;
             ParseUser.LogOutAsync();
