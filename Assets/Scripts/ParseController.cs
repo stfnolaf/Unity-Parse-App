@@ -130,18 +130,25 @@ public class ParseController : MonoBehaviour {
         ParseQuery<ParseObject> query = ParseObject.GetQuery("ServerConfig").WhereEqualTo("name", AcctName);
         query.FirstAsync().ContinueWith(t =>
         {
-            ParseObject ServerConfigObj = t.Result;
-            if(!ServerConfigObj.ContainsKey("account"))
+            if(t.IsFaulted || t.IsCanceled)
             {
                 AccountQueryFailed = true;
             }
             else
             {
-                ParseObject temp;
-                ServerConfigObj.TryGetValue<ParseObject>("account", out temp);
-                AcctId = temp.ObjectId;
-                AccountFound = true;
-                NextStep = true;
+                ParseObject ServerConfigObj = t.Result;
+                if (!ServerConfigObj.ContainsKey("account"))
+                {
+                    AccountQueryFailed = true;
+                }
+                else
+                {
+                    ParseObject temp;
+                    ServerConfigObj.TryGetValue<ParseObject>("account", out temp);
+                    AcctId = temp.ObjectId;
+                    AccountFound = true;
+                    NextStep = true;
+                }
             }
         });
     }
